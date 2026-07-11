@@ -34,18 +34,34 @@ void wifi_init(){
 }
 void html_page()
 {
-  float temperature = bmp.readTemperature();
-  String html = "<html>Room temperature sensor<br>Current temperature: ";
-  html += String(temperature, 1);
+  String html = 
+  "<html><body>Room temperature sensor<br>"
+    "Current temperature:"
+    "<span id='temp'>"
+      "--"
+    "</span> &deg;C"
+    "<script>"
+      "function temp_fetch(){fetch('/temperature').then(r=>r.text()).then(t=>{"
+        "document.getElementById('temp').innerText=t;"
+      "})};"
+      "temp_fetch();"
+      "setInterval(temp_fetch, 2000);"
+    "</script>"
+  "</body></html>";
   server.send(200, "text/html", html);
+}
+void temperature_send()
+{
+  float temperature = bmp.readTemperature();
+  server.send(200, "text/plain", String(temperature, 1));
 }
 void setup() {
   sensor_init();
   wifi_init();
   server.on("/", html_page);
+  server.on("/temperature", temperature_send);
   server.begin();
 }
 void loop() {
   server.handleClient();
-  
 }
