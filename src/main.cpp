@@ -2,6 +2,7 @@
 #include <Adafruit_BMP085.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include "time.h"
 #include "../include/config.h"
 
 Adafruit_BMP085 bmp;
@@ -37,6 +38,16 @@ void wifi_init(){
     Serial.print("Local ESP32 IP: ");
     Serial.println(WiFi.localIP());
   }
+}
+void get_local_time(){
+  struct tm timeinfo;
+  configTime(GMT_OFFSET, DST_OFFSET, NTP_ADRESS);
+  
+  if(!getLocalTime(&timeinfo)) {  // prenos pozadavku na server NTP a analyza casoveho razitka
+      Serial.println("Failed to retrieve time data");
+      return;
+   }
+   Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 }
 void html_page(){
   String html = 
@@ -110,6 +121,7 @@ void minimum_send(){
 void setup(){
   sensor_init();
   wifi_init();
+  get_local_time();
   server.on("/", html_page);
   server.on("/temperature", temperature_send);
   server.on("/maximum", maximum_send);
