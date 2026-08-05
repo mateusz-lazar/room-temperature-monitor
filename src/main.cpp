@@ -9,10 +9,11 @@ Adafruit_BMP085 bmp;
 WebServer server(80);
 
 struct min_max{
-  float min_temp = 100;
-  float max_temp = -100;
+  float min_temp = INIT_MIN;
+  float max_temp = INIT_MAX;
 };
 min_max temp_data;
+bool midnight_reset = false;
 
 void sensor_init(){
   Serial.begin(115200);
@@ -43,11 +44,25 @@ void get_local_time(){
   struct tm timeinfo;
   configTime(GMT_OFFSET, DST_OFFSET, NTP_ADRESS);
   
-  if(!getLocalTime(&timeinfo)) {  // prenos pozadavku na server NTP a analyza casoveho razitka
+  if(!getLocalTime(&timeinfo)) {
       Serial.println("Failed to retrieve time data");
       return;
    }
    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+}
+void check_midnight_reset(){
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    return;
+  }
+  if(timeinfo.tm_hour == 0 && timeinfo.tm_min == 0 && !midnight_reset){
+    temp_data.min_temp = INIT_MIN;
+    temp_data.max_temp = INIT_MAX;
+    midnight_reset = true;
+  }
+  if(timeinfo.tm_hour == 1 && timeinfo.tm_min == 0 && midnight_reset){
+    midnight_reset = false;
+  }
 }
 void html_page(){
   String html = 
@@ -130,4 +145,5 @@ void setup(){
 }
 void loop(){
   server.handleClient();
+  check_midnight_reset();
 }
