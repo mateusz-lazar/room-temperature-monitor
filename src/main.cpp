@@ -4,6 +4,7 @@
 #include <WebServer.h>
 #include "time.h"
 #include "../include/config.h"
+#include <ArduinoJson.h>
 
 Adafruit_BMP085 bmp;
 WebServer server(80);
@@ -11,8 +12,9 @@ WebServer server(80);
 struct min_max{
   float min_temp = INIT_MIN;
   float max_temp = INIT_MAX;
+  float temp = 0;
 };
-min_max temp_data;
+min_max data_struct;
 bool midnight_reset = false;
 
 void sensor_init(){
@@ -56,8 +58,8 @@ void check_midnight_reset(){
     return;
   }
   if(timeinfo.tm_hour == 0 && timeinfo.tm_min == 0 && !midnight_reset){
-    temp_data.min_temp = INIT_MIN;
-    temp_data.max_temp = INIT_MAX;
+    data_struct.min_temp = INIT_MIN;
+    data_struct.max_temp = INIT_MAX;
     midnight_reset = true;
   }
   if(timeinfo.tm_hour == 1 && timeinfo.tm_min == 0 && midnight_reset){
@@ -66,81 +68,50 @@ void check_midnight_reset(){
 }
 void html_page(){
   String html = 
-  "<html><body>Room temperature sensor<br>"
-    "Current temperature: "
-    "<span id='temp'>"
-      "--"
-    "</span> &deg;C"
+   "<html><body>Room temperature sensor<br>"
+    "Current temperature: <span id='temp'>--</span> &deg;C<br>"
+    "Day maximum: <span id='max'>--</span> &deg;C<br>"
+    "Day minimum: <span id='min'>--</span> &deg;C"
+    
     "<script>"
-      "function temp_fetch(){fetch('/temperature').then(r=>r.text()).then(t=>{"
-        "document.getElementById('temp').innerText=t;"
-      "})};"
+      "function data_fetch(){"
+        "fetch('/data').then(r=>r.json()).then(d=>{"
+          "document.getElementById('temp').innerText=d.temp;"
+          "document.getElementById('max').innerText=d.max;"
+          "document.getElementById('min').innerText=d.min;"
+        "});"
+      "}"
+      "data_fetch();"
+      "setInterval(data_fetch, 2000);"
     "</script>"
-    "<br>Day maximum: "
-    "<span id='maximum'>"
-      "--"
-    "</span> &deg;C"
-    "<script>"
-      "function maximum_fetch(){fetch('/maximum').then(r=>r.text()).then(t=>{"
-        "document.getElementById('maximum').innerText=t;"
-      "})};"
-    "</script>"
-    "<br>Day minimum: "
-    "<span id='minimum'>"
-      "--"
-    "</span> &deg;C"
-    "<script>"
-      "function minimum_fetch(){fetch('/minimum').then(r=>r.text()).then(t=>{"
-        "document.getElementById('minimum').innerText=t;"
-      "})};"
-
-      "temp_fetch();"
-      "setInterval(temp_fetch, 2000);"
-      "maximum_fetch();"
-      "setInterval(maximum_fetch, 2000);"
-      "minimum_fetch();"
-      "setInterval(minimum_fetch, 2000);"
-      "</script>"
-
   "</body></html>";
+
   server.send(200, "text/html", html);
 }
-void temperature_send(){
-  float temperature = bmp.readTemperature();
-  server.send(200, "text/plain", String(temperature, 1));
-}
-void maximum_send(){
-  float temperature = bmp.readTemperature();
+void data_send(){
+  data_struct.temp = bmp.readTemperature();
 
-  //change min and max temperature if exceeded
-  if (temperature > temp_data.max_temp){
-    temp_data.max_temp = temperature;
+    //change min and max temperature if exceeded
+  if (data_struct.temp > data_struct.max_temp){
+    data_struct.max_temp = data_struct.temp;
   }
-   if (temperature < temp_data.min_temp){
-    temp_data.min_temp = temperature;
+   if (data_struct.temp < data_struct.min_temp){
+    data_struct.min_temp = data_struct.temp;
   }
-   server.send(200, "text/plain", String(temp_data.max_temp, 1));
-}
-void minimum_send(){
-  float temperature = bmp.readTemperature();
 
-  //change min and max temperature if exceeded
-  if (temperature > temp_data.max_temp){
-    temp_data.max_temp = temperature;
-  }
-   if (temperature < temp_data.min_temp){
-    temp_data.min_temp = temperature;
-  }
-   server.send(200, "text/plain", String(temp_data.min_temp, 1));
+  String json = "{";
+  json += "\"temp\":" + String(data_struct.temp, 1) + ",";
+  json += "\"max\":" + String(data_struct.max_temp, 1) + ",";
+  json += "\"min\":" + String(data_struct.min_temp, 1) + "}";
+
+  server.send(200, "text/plain", json);
 }
 void setup(){
   sensor_init();
   wifi_init();
   get_local_time();
   server.on("/", html_page);
-  server.on("/temperature", temperature_send);
-  server.on("/maximum", maximum_send);
-  server.on("/minimum", minimum_send);
+  server.on("/data", data_send);
   server.begin();
 }
 void loop(){
