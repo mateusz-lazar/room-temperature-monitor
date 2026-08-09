@@ -73,7 +73,7 @@ void html_page(){
 void data_send(){
   data_struct.temp = bmp.readTemperature();
 
-    //change min and max temperature if exceeded
+  //change min and max temperature if exceeded
   if(data_struct.temp > data_struct.max_temp){
     data_struct.max_temp = data_struct.temp;
   }
@@ -81,11 +81,8 @@ void data_send(){
     data_struct.min_temp = data_struct.temp;
   }
 
-  String json = "{";
-  json += "\"temp\":" + String(data_struct.temp, 1) + ",";
-  json += "\"max\":" + String(data_struct.max_temp, 1) + ",";
-  json += "\"min\":" + String(data_struct.min_temp, 1) + "}";
-
+  char json[128];
+  snprintf(json, sizeof(json), "{\"temp\":%02f,\"max\":%02f,\"min\":%02f}", data_struct.temp, data_struct.max_temp, data_struct.min_temp);
   server.send(200, "text/plain", json);
 }
 void setup(){
