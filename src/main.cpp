@@ -47,9 +47,11 @@ void get_local_time(){
   struct tm timeinfo;
   configTime(GMT_OFFSET, DST_OFFSET, NTP_ADRESS);
   
-  if(!getLocalTime(&timeinfo)) {
-      Serial.println("Failed to retrieve time data");
-      return;
+  Serial.println("Retrieving time data");
+
+  while(!getLocalTime(&timeinfo)) {
+    Serial.println(".");
+    delay(100);
    }
    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 }
@@ -82,7 +84,7 @@ void data_send(){
   }
 
   char json[128];
-  snprintf(json, sizeof(json), "{\"temp\":%02f,\"max\":%02f,\"min\":%02f}", data_struct.temp, data_struct.max_temp, data_struct.min_temp);
+  snprintf(json, sizeof(json), "{\"temp\":%.1f,\"max\":%.1f,\"min\":%.1f}", data_struct.temp, data_struct.max_temp, data_struct.min_temp);
   server.send(200, "text/plain", json);
 }
 void setup(){

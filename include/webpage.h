@@ -9,9 +9,9 @@ const char html[] = R"rawliteral(
     <script>
       function data_fetch(){
         fetch('/data').then(r=>r.json()).then(d=>{
-          document.getElementById('temp').innerText=d.temp;
-          document.getElementById('max').innerText=d.max;
-          document.getElementById('min').innerText=d.min;
+          document.getElementById('temp').innerText=d.temp.toFixed(1);
+          document.getElementById('max').innerText=d.max.toFixed(1);
+          document.getElementById('min').innerText=d.min.toFixed(1);
         });
       }
       data_fetch();
