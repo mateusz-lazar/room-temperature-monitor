@@ -16,66 +16,37 @@ struct min_max{
   float temp = 0;
 };
 min_max data_struct;
-bool midnight_reset = false;
 struct tm timeinfo;
+bool midnight_reset = false;
+typedef bool (*CheckFn)();
 
-void sensor_init(){
-  Serial.begin(115200);
-
-  int sensor_timeout_counter = 0;
-  Serial.println("Connecting to the BMP180 sensor");
-  while(!bmp.begin()){
-    if(sensor_timeout_counter >= 100){
-      Serial.println("\nCouldn't connect to the BMP180 sensor, retrying in 15 minutes");
-      break;
+void go_to_sleep(){
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  esp_deep_sleep_start();
+}
+void init_function(CheckFn check_function, const char* message1, const char* message2, const char* message3){
+  int counter = 0;
+  Serial.println(message1);
+  while(!check_function()){
+    if(counter >= CONNECTION_TIMEOUT){
+      Serial.println();
+      Serial.println(message2);
+      go_to_sleep();
     }
     Serial.print(".");
-    delay(100);
-    sensor_timeout_counter++;
+    delay(1000);
+    counter++;
   }
-  if(bmp.begin()){
-    Serial.println("Connected to the BMP180 sensor");
-  }
+  Serial.println(message3);
 }
-void wifi_init(){
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-  int wifi_timeout_counter = 0;
-  Serial.println("Connecting to WiFi");
-  while(WiFi.status() != WL_CONNECTED)
-  {
-    if(wifi_timeout_counter >= 100){
-      Serial.println("\nCouldn't connect to the WiFi network, retrying in 15 minutes");
-      break;
-    }
-    Serial.print(".");
-    delay(100);
-    wifi_timeout_counter++;
-  }
-  if(WiFi.status() == WL_CONNECTED){
-    Serial.println("\nConnected to the WiFi network");
-    Serial.print("Local ESP32 IP: ");
-    Serial.println(WiFi.localIP());
-  }
+bool sensor_check(){
+  return(bmp.begin());
 }
-void get_local_time(){
-  configTime(GMT_OFFSET, DST_OFFSET, NTP_ADRESS);
-  
-  int NTP_timeout = 0;
-  Serial.println("Retrieving time data");
-  while(!getLocalTime(&timeinfo)) {
-    if(NTP_timeout >= 100){
-      Serial.println("\nCouldn't connect to the NTP network, retrying in 15 minutes");
-      break;
-    }
-    Serial.println(".");
-    delay(100);
-    NTP_timeout++;
-   }
-   if(getLocalTime(&timeinfo)){
-     Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-   }
+bool wifi_check(){
+  return(WiFi.status() == WL_CONNECTED);
+}
+bool ntp_check(){
+  return(getLocalTime(&timeinfo));
 }
 void check_midnight_reset(){
   struct tm timeinfo;
@@ -110,24 +81,23 @@ void data_send(){
   server.send(200, "text/plain", json);
 }
 void setup(){
-  sensor_init();
-  if(bmp.begin())
-  {
-    wifi_init();
-  }
-  if(WiFi.status() == WL_CONNECTED && bmp.begin())
-  {
-    get_local_time();
-  }
-  if(WiFi.status() == WL_CONNECTED && bmp.begin() && getLocalTime(&timeinfo)){
-    server.on("/", html_page);
-    server.on("/data", data_send);
-    server.begin();
-  }
-  else{
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-    esp_deep_sleep_start();
-  }
+  Serial.begin(115200);
+  init_function(sensor_check,"Connecting to the BMP180 sensor", "Failed to connect to the BMP180 sensor, retrying in 15 minutes", "Connected to the BMP180 sensor");
+  
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  init_function(wifi_check,"Connecting to the WiFi network", "Failed to connect to the WiFi network, retrying in 15 minutes", "Connected to the WiFi network");
+  Serial.print("Local ESP32 IP: ");
+  Serial.println(WiFi.localIP());
+
+  configTime(GMT_OFFSET, DST_OFFSET, NTP_ADRESS);
+  init_function(ntp_check,"Connecting to the NTP server", "Failed to connect to the NTP server, retrying in 15 minutes", "Connected to the NTP server");
+  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+  
+  server.on("/", html_page);
+  server.on("/data", data_send);
+  server.begin();
+ 
 }
 void loop(){
   server.handleClient();
