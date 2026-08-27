@@ -41,6 +41,7 @@ The ESP32 reads temperature from the BMP180 sensor and displays current temperat
 3. Fill in config.h with your data
 4. If using different ESP32 board, change wiring
 5. Connect ESP32 and upload
+6. Connect to the IP adress provided by ESP32 in serial monitor
 
 ## Notes
 
