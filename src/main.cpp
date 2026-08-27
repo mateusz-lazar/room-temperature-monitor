@@ -5,7 +5,6 @@
 #include "time.h"
 #include "../include/config.h"
 #include "../include/webpage.h"
-#include <ArduinoJson.h>
 
 Adafruit_BMP085 bmp;
 WebServer server(80);
@@ -49,7 +48,6 @@ bool ntp_check(){
   return(getLocalTime(&timeinfo));
 }
 void check_midnight_reset(){
-  struct tm timeinfo;
   if(!getLocalTime(&timeinfo)){
     return;
   }
@@ -66,7 +64,16 @@ void html_page(){
   server.send(200, "text/html", html);
 }
 void data_send(){
-  data_struct.temp = bmp.readTemperature();
+  float t = bmp.readTemperature();
+  char json[128];
+  
+  if(isnan(t)){
+    Serial.println("Sensor read failed");
+    snprintf(json, sizeof(json), "{\"temp\": \"failed to read data\",\"max\":%.1f,\"min\":%.1f}", data_struct.max_temp, data_struct.min_temp);
+    server.send(500, "text/plain", json);
+    return;
+  }
+  data_struct.temp = t;
 
   //change min and max temperature if exceeded
   if(data_struct.temp > data_struct.max_temp){
@@ -76,7 +83,6 @@ void data_send(){
     data_struct.min_temp = data_struct.temp;
   }
 
-  char json[128];
   snprintf(json, sizeof(json), "{\"temp\":%.1f,\"max\":%.1f,\"min\":%.1f}", data_struct.temp, data_struct.max_temp, data_struct.min_temp);
   server.send(200, "text/plain", json);
 }
